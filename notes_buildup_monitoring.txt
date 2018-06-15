@@ -1,0 +1,216 @@
+Op de monitorserver:
+https://www.howtoforge.com/tutorial/ubuntu-nagios/
+
+sudo apt-get install wget build-essential apache2 php apache2-mod-php7.0 php-gd libgd-dev sendmail unzip
+
+add user to run nagios:
+nagios / nagcmd
+
+useradd nagios
+groupadd nagcmd
+usermod -a -G nagcmd nagios
+usermod -a -G nagios,nagcmd www-data
+
+//Download Nagios
+cd ~
+wget https://assets.nagios.com/downloads/nagioscore/releases/nagios-4.2.0.tar.gz
+tar -xzf nagios*.tar.gz
+cd nagios-4.2.0
+
+//Compile Nagios
+./configure --with-nagios-group=nagios --with-command-group=nagcmd
+
+//install nagios
+make all
+sudo make install
+sudo make install-commandmode
+sudo make install-init
+sudo make install-config
+/usr/bin/install -c -m 644 sample-config/httpd.conf /etc/apache2/sites-available/nagios.conf
+
+//copy eventhandler to nagios
+cp -R contrib/eventhandlers/ /usr/local/nagios/libexec/
+chown -R nagios:nagios /usr/local/nagios/libexec/eventhandlers
+
+//install plugins
+cd ~
+wget https://nagios-plugins.org/download/nagios-plugins-2.1.2.tar.gz
+tar -xzf nagios-plugins*.tar.gz
+cd nagios-plugin-2.1.2/
+
+./configure --with-nagios-user=nagios --with-nagios-group=nagios --with-openssl
+make
+make install
+
+//configure 
+nano /usr/local/nagios/etc/nagios.cfg
+//uncomment line 51: cfg_dir=/usr/local/nagios/etc/servers
+-save and exit
+
+Add a new folder named servers:
+mkdir -p /usr/local/nagios/etc/servers
+
+The Nagios contact can be configured in the contact.cfg file. To open it use:
+nano /usr/local/nagios/etc/objects/contacts.cfg
+-change default email to yours
+
+//configuring apache
+sudo a2enmod rewrite
+sudo a2enmod cgi
+
+give apache2 a restart
+
+sudo htpasswd -c /usr/local/nagios/etc/htpasswd.users nagiosadmin
+and type password: De_joost4
+//adding password for user nagiosadmin
+
+//enable nagios
+sudo ln -s /etc/apache2/sites-available/nagios.conf /etc/apache2/sites-enabled/
+
+service apache2 restart
+service nagios start
+
+//hier ging nagios lastig doen
+//oplossing: https://serverfault.com/questions/774498/failed-to-start-nagios-service-unit-nagios-service-failed-to-load-no-such-file/774501
+
+ sudo nano /etc/systemd/system/nagios.service
+ hier typ je het volgende in:
+ 
+ 
+ [Unit]
+Description=Nagios
+BindTo=network.target
+
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+User=nagios
+Group=nagios
+Type=simple
+ExecStart=/usr/local/nagios/bin/nagios /usr/local/nagios/etc/nagios.cfg
+
+
+daarna het volgende doen:
+sudo systemctl enable /etc/systemd/system/nagios.service
+sudo systemctl start nagios
+sudo systemctl restart nagios
+
+Als het goed is kun je nu vanaf windows server naar je nagios toe komen.
+
+
+
+//toevoegen van een host
+#sudo apt-get install nagios-nrpe-server nagios-plugins
+
+#nano /etc/nagios/nrpe.cfg
+add nagios server ip: 10.0.72.6 to _server_adress_
+
+//restart NRPE
+service nagios-nrpe-server restart
+
+//add ubuntu host to nagios server | OP DE NAGIOS SERVER DE VOLGENDE COMMANDO UITVOEREN
+vim /usr/local/nagios/etc/servers/ubuntu_host.cfg
+
+!!!LETOP!!!
+pas het address aan naar de address van je host VM die je wilt toevoegen 
+
+# Ubuntu Host configuration file
+
+define host {
+        use                          linux-server
+        host_name                    ubuntu_host
+        alias                        Ubuntu Host
+        address                      192.168.1.10
+        register                     1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             PING
+      check_command                   check_ping!100.0,20%!500.0,60%
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Check Users
+      check_command           check_local_users!20!50
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Local Disk
+      check_command                   check_local_disk!20%!10%!/
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Check SSH
+      check_command                   check_ssh
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Total Process
+      check_command                   check_local_procs!250!400!RSZDT
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+op de host:
+service nagios-nrpe-server restart
+
+op de nagios server:
+service apache2 restart
+service nagios restart
+
+

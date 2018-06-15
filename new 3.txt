@@ -1,0 +1,27 @@
+install cacti
+rsyslog-mysql
+
+op de minion
+apt-get
+snmp
+snmpd
+mysql
+apache2
+php
+
+snmpd config file - 
+etc/snmp/snmpd.conf
+
+
+
+listen for connection 
+
+
+
+iets openen
+
+
+rsyslog config file op minion
+iets toevoegen - ff naar kijken log files doorsturen
+
+op de monitor
