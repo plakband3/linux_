@@ -1,0 +1,3 @@
+cacti:
+	pkg:
+		- installed
